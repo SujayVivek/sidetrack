@@ -131,7 +131,7 @@ def set_meta(path: Path, key: str, value: str) -> None:
 # ---------- state ----------
 
 def default_state() -> dict:
-    return {"active": ROOT_CONTEXT, "turns_since_save": 0, "last_seen_commit": None}
+    return {"active": ROOT_CONTEXT, "turns_since_save": 0, "nudged_at": None, "last_seen_commit": None}
 
 
 def load_state() -> dict:
@@ -147,6 +147,9 @@ def load_state() -> dict:
         st["active"] = ROOT_CONTEXT
     if not isinstance(st.get("turns_since_save"), int):
         st["turns_since_save"] = 0
+    st["nudged_at"] = None
+    if not isinstance(st.get("nudged_at"), int):
+        st["nudged_at"] = None
     return st
 
 
@@ -223,6 +226,79 @@ def chain(name: str, ctxs: dict) -> list:
     return out
 
 
+# ---------- reading context files (used by the hooks) ----------
+
+COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+
+
+def read_section(name: str, title: str, limit: int = 1500) -> str:
+    """Body of the '## <title>' section of a context file, template comments removed, capped."""
+    try:
+        text = ctx_path(name).read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    text = COMMENT_RE.sub("", text)
+    m = re.search(rf"^##[ \t]+{re.escape(title)}[ \t]*$(.*?)(?=^##[ \t]|\Z)", text, re.M | re.S)
+    if not m:
+        return ""
+    body = m.group(1).strip()
+    if len(body) > limit:
+        body = body[:limit].rstrip() + " ...(truncated; read the file for the rest)"
+    return body
+
+
+def has_conflict_markers(name: str) -> bool:
+    try:
+        text = ctx_path(name).read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return bool(re.search(r"^(<{7} |>{7} )", text, re.M))
+
+
+def git(*args, timeout=5):
+    """Run git in the project root. Returns stripped stdout, or None on any failure."""
+    try:
+        r = subprocess.run(["git", *args], capture_output=True, text=True, timeout=timeout,
+                           cwd=str(ROOT), encoding="utf-8", errors="replace")
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def head_commit():
+    return git("rev-parse", "HEAD")
+
+
+def changes_since(last, me: str) -> str:
+    """Short report of commits by other people (and context files they changed) since commit `last`."""
+    if not last:
+        return ""
+    log = git("log", f"{last}..HEAD", "--no-merges", "--format=%h%x09%an%x09%s")
+    if not log:
+        return ""
+    commits = []
+    for line in log.splitlines():
+        parts = line.split("\t", 2)
+        if len(parts) == 3 and parts[1] != me:
+            commits.append(parts)
+    changed = git("diff", "--name-only", "--relative", last, "HEAD", "--", ".sidetrack/contexts") or ""
+    ctx_lines = []
+    for f in changed.splitlines():
+        authors = git("log", f"{last}..HEAD", "--no-merges", "--format=%an", "--", f) or ""
+        who = sorted({a for a in authors.splitlines() if a and a != me})
+        if who:
+            ctx_lines.append(f"- context '{Path(f).stem}' was updated by {', '.join(who)}")
+    if not commits and not ctx_lines:
+        return ""
+    out = [f"Since your last session, teammates changed the project ({len(commits)} commit(s) by others)."]
+    out += ctx_lines
+    for h, who, subject in commits[:8]:
+        out.append(f"- {h} {who}: {subject}")
+    if len(commits) > 8:
+        out.append(f"- ...and {len(commits) - 8} more")
+    return "\n".join(out)
+
+
 # ---------- commands ----------
 
 def print_kv(**kv):
@@ -259,6 +335,7 @@ def cmd_go(args):
         set_meta(ctx_path(name), "status", "open")  # reopening a finished context
     st["active"] = name
     st["turns_since_save"] = 0
+    st["nudged_at"] = None
     save_state(st)
     meta = read_meta(ctx_path(name))
     print_kv(switched="yes", previous=prev, previous_file=rel(ctx_path(prev)),
@@ -279,6 +356,7 @@ def cmd_back(args):
         fail(f"parent '{parent}' of '{cur}' does not exist")
     st["active"] = parent
     st["turns_since_save"] = 0
+    st["nudged_at"] = None
     save_state(st)
     if done:
         set_meta(ctx_path(cur), "status", "done")
@@ -328,6 +406,7 @@ def cmd_saved(_args):
     ensure_init()
     st = load_state()
     st["turns_since_save"] = 0
+    st["nudged_at"] = None
     save_state(st)
     set_meta(ctx_path(st["active"]), "updated", today())
     print_kv(saved=st["active"], file=rel(ctx_path(st["active"])), updated=today())
