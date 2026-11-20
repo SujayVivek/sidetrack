@@ -89,6 +89,25 @@ class StateTests(unittest.TestCase):
         self.run_cmd("saved")
         self.assertEqual(self.state()["turns_since_save"], 0)
 
+    def test_back_done_marks_child_finished(self):
+        self.run_cmd("go", "deploy")
+        out = self.kv(self.run_cmd("back", "--done"))
+        self.assertEqual(out["finished"], "yes")
+        self.assertIn("status: done", (self.root / ".sidetrack/contexts/deploy.md").read_text())
+        self.assertIn("deploy [done", self.run_cmd("list"))
+        self.run_cmd("go", "deploy")  # reopening a done context
+        self.assertIn("status: open", (self.root / ".sidetrack/contexts/deploy.md").read_text())
+
+    def test_back_without_done_leaves_status(self):
+        self.run_cmd("go", "deploy")
+        self.assertEqual(self.kv(self.run_cmd("back"))["finished"], "no")
+        self.assertIn("status: open", (self.root / ".sidetrack/contexts/deploy.md").read_text())
+
+    def test_rules_printed(self):
+        out = self.run_cmd("rules")
+        self.assertIn("Merging up to the parent", out)
+        self.assertIn("Secrets", out)
+
     def test_list_tree(self):
         self.run_cmd("go", "deploy")
         self.run_cmd("go", "stripe-bug")

@@ -8,12 +8,13 @@ state.json by hand; it calls this script.
 Usage:
   state.py init                  create .sidetrack/ and the root context "main"
   state.py go <name> [purpose]   switch to <name>, creating it (child of the active context) if new
-  state.py back                  switch to the active context's parent
+  state.py back [--done]         switch to the active context's parent (--done marks the one you leave as finished)
   state.py list                  print the context tree
   state.py status                print the active context and save counter
   state.py saved                 record a save: reset counter, bump 'updated' date
   state.py tick                  count one user turn (used by the prompt hook)
   state.py author                print the author name used in log entries
+  state.py rules                 print the rules for writing context files
 
 Project root: $CLAUDE_PROJECT_DIR, else the git top level, else the cwd.
 Stdlib only, Python 3.8+.
@@ -254,7 +255,8 @@ def cmd_go(args):
         new_context(name, prev, purpose)
     elif purpose:
         set_meta(ctx_path(name), "purpose", purpose)
-    set_meta(ctx_path(name), "status", "active")
+    if read_meta(ctx_path(name)).get("status") == "done":
+        set_meta(ctx_path(name), "status", "open")  # reopening a finished context
     st["active"] = name
     st["turns_since_save"] = 0
     save_state(st)
@@ -265,7 +267,8 @@ def cmd_go(args):
              parent_file=rel(ctx_path(meta["parent"])) if meta.get("parent", "none") != "none" else "none")
 
 
-def cmd_back(_args):
+def cmd_back(args):
+    done = "--done" in args
     ensure_init()
     st = load_state()
     cur = st["active"]
@@ -277,8 +280,11 @@ def cmd_back(_args):
     st["active"] = parent
     st["turns_since_save"] = 0
     save_state(st)
+    if done:
+        set_meta(ctx_path(cur), "status", "done")
     print_kv(switched="yes", previous=cur, previous_file=rel(ctx_path(cur)),
-             active=parent, file=rel(ctx_path(parent)))
+             active=parent, file=rel(ctx_path(parent)),
+             finished="yes" if done else "no")
 
 
 def cmd_list(_args):
@@ -339,8 +345,17 @@ def cmd_author(_args):
     print(author())
 
 
+def cmd_rules(_args):
+    rules = TEMPLATE.parent.parent / "reference" / "writing-rules.md"
+    try:
+        print(rules.read_text(encoding="utf-8").strip())
+    except OSError:
+        fail(f"rules file not found: {rules}")
+
+
 COMMANDS = {"init": cmd_init, "go": cmd_go, "back": cmd_back, "list": cmd_list,
-            "status": cmd_status, "saved": cmd_saved, "tick": cmd_tick, "author": cmd_author}
+            "status": cmd_status, "saved": cmd_saved, "tick": cmd_tick, "author": cmd_author,
+            "rules": cmd_rules}
 
 
 def main(argv):
