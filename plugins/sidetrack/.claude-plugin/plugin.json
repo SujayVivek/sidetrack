@@ -1,0 +1,8 @@
+{
+  "name": "sidetrack",
+  "version": "0.1.0",
+  "description": "Linked sub-contexts inside one Claude Code chat, backed by markdown files in your repo.",
+  "author": { "name": "Sujay Vivek" },
+  "license": "MIT",
+  "keywords": ["context", "memory", "sub-context", "workflow", "compaction"]
+}
