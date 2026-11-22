@@ -1,44 +1,96 @@
 # sidetrack
 
-Linked sub-contexts for [Claude Code](https://code.claude.com).
+**Side quests for Claude Code, without losing the main story.**
 
-You're building an app, you need to deploy it, and 40 messages of error logs later Claude has lost the thread of what you built. **sidetrack** lets you branch off into a named context (`deploy`, `brainstorm`, `stripe-bug`), work there, and come back. Lessons are handed to the parent context, and everything important lives in markdown files in your repo, so it survives `/compact`, new sessions, and teammates.
+You are building an app. Then you need to deploy it. Forty messages of error logs later, Claude has lost the thread of what you built.
 
-> Status: early development (v0.4.2). Commands, hooks and merge-conflict resolution work.
+sidetrack lets you step aside into a named context (`deploy`, `stripe-bug`, `brainstorm`), work there, and come back. What matters is saved in small markdown files in your repo, so it survives `/compact`, new sessions and teammates.
 
-## Commands
+> Status: early development (v0.4.2). Commands, hooks and merge-conflict resolution all work.
 
-| Command | Does |
-|---|---|
-| `/sidetrack:go <name> [purpose]` | Save the current context, then switch to `<name>` (created as a child of the current one if new) |
-| `/sidetrack:back [done]` | Save, hand lessons up to the parent, switch back. `done` marks the finished context as done. |
-| `/sidetrack:save` | Checkpoint the current context without switching |
-| `/sidetrack:list` | Show the context tree (conflicted contexts are flagged) |
-| `/sidetrack:resolve` | Fix git merge conflicts in context files: keeps every decision and gotcha from both sides, then reconciles the state sections |
+## How it works
 
-### Resolving conflicts
+```
+main ──── go deploy ────▶ deploy ──── back ────▶ main
+ │                          │                      │
+ │  Current state           │  Decisions           │  lessons from deploy
+ │  Decisions               │  Gotchas & fixes     │  are waiting here
+ └─ .sidetrack/contexts/main.md   └─ .sidetrack/contexts/deploy.md
+```
 
-When a pull or merge leaves conflict markers in a context file, run `/sidetrack:resolve`. A script merges what can be merged by rule (every decision, gotcha and "sent to parent" entry from both sides is kept, exact duplicates dropped, entries ordered by date) and saves the original in `.sidetrack/local/resolve/`. Claude then writes one reconciled "Current state" and "Open threads", flagging any contradictions for you to decide. A second script verifies that nothing was lost before it reports success. It never runs git commands: you stage the file and continue your merge yourself.
+- A **context** is a named piece of work. Contexts form a tree: `deploy` is a child of `main`.
+- Each context has a **context file** in `.sidetrack/contexts/`. You commit it with your code.
+- When you switch, the context you leave is saved and the new one is loaded.
+- When you go back, lessons are handed up to the parent.
 
-Context files live in `.sidetrack/contexts/` and are meant to be committed. `.sidetrack/local/` (your active context) is ignored by git automatically.
-
-## Hooks (automatic)
-
-- **Every prompt** gets a one-line tag for Claude: the active context, its parent, the other contexts, and the number of unsaved turns. After 15 unsaved turns Claude ends its reply with a one-line reminder to run `/sidetrack:save` (it repeats every 10 turns). Change the threshold with the environment variable `SIDETRACK_NUDGE_TURNS`.
-- **On startup, resume, `/clear` and `/compact`** the active context's saved "Current state" and "Open threads" (and its parent's state) are put back into the conversation. This is what makes `/compact` safe.
-- **On startup and resume** you also get a short report of commits and context changes made by teammates since your last session.
-- In projects without a `.sidetrack/` folder the hooks do nothing.
-
-Troubleshooting: if Claude does not seem to see the tag or the reloaded context, set `SIDETRACK_HOOK_OUTPUT=plain` in your environment to switch the hooks to plain-text output. Hook errors are written to `.sidetrack/local/hook-error.log`.
-
-Requires Python 3 (`python3`, or `python` on Windows). Never put secrets in context files.
-
-## Install
+## Quick start
 
 ```
 /plugin marketplace add <github-user>/sidetrack
 /plugin install sidetrack@sidetrack
 ```
+
+Then, in any project:
+
+```
+/sidetrack:go deploy getting it live     # create "deploy" and switch to it
+...fix things, break things...
+/sidetrack:back done                     # save, hand lessons up, return to main
+```
+
+Requires Python 3 (`python3`, or `python` on Windows). No other dependencies.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `/sidetrack:go <name> [purpose]` | Save the current context, then switch to `<name>`. A new name is created as a child of the current context. |
+| `/sidetrack:back [done]` | Save, hand lessons up to the parent, switch back. `done` marks the finished context as done. |
+| `/sidetrack:save` | Save the current context without switching. |
+| `/sidetrack:list` | Show the context tree. Contexts with a merge conflict are flagged. |
+| `/sidetrack:resolve` | Fix a git merge conflict in context files. |
+
+Names use lowercase letters, digits and dashes, up to 40 characters.
+
+## What a context file holds
+
+| Section | How it changes |
+|---|---|
+| Current state | Rewritten on each save (15 lines at most) |
+| Decisions | Only added to |
+| Gotchas & fixes | Only added to |
+| Sent to parent | Only added to |
+| Open threads | Rewritten on each save |
+
+Added lines look like `- 2026-11-20 (author): text`. Only the commands above write context files. The hooks never do.
+
+## Hooks (automatic)
+
+- **Every message** gets a one-line tag for Claude: the active context, its parent, the other contexts and the number of unsaved turns.
+- **Save reminder.** After 15 unsaved turns, Claude ends its reply with a one-line reminder to run `/sidetrack:save`. It repeats every 10 turns. Change the threshold with `SIDETRACK_NUDGE_TURNS`.
+- **On startup, resume, `/clear` and `/compact`**, the active context's "Current state" and "Open threads" (and its parent's state) are put back into the conversation. This is what makes `/compact` safe.
+- **On startup and resume**, you get a short report of commits and context changes made by teammates since your last session.
+- In projects without a `.sidetrack/` folder, the hooks do nothing.
+
+## Working in a team
+
+Context files go to git, so a teammate who pulls your work gets your context too. Your active context is not shared: it lives in `.sidetrack/local/`, which git ignores.
+
+When a merge leaves conflict markers in a context file, run `/sidetrack:resolve`:
+
+1. A script merges by rule. Every decision, gotcha and "sent to parent" line from both sides is kept, exact duplicates are dropped, and lines are ordered by date. The original is saved in `.sidetrack/local/resolve/`.
+2. Claude writes one "Current state" and one "Open threads" that are true for both sides, and flags any contradiction for you to decide.
+3. A second script checks that no line from either side was lost.
+
+It never runs git commands. You stage the file and finish the merge yourself.
+
+## Troubleshooting
+
+- **Claude does not seem to see the tag or the reloaded context.** Set `SIDETRACK_HOOK_OUTPUT=plain` to switch the hooks to plain-text output.
+- **Something broke in a hook.** Hooks never block your work. Errors go to `.sidetrack/local/hook-error.log`.
+- **Two Claude windows on one project** share the same active context.
+
+Never put secrets in context files. They are committed to git.
 
 ## Develop locally
 
@@ -46,6 +98,7 @@ Requires Python 3 (`python3`, or `python` on Windows). Never put secrets in cont
 git clone https://github.com/<github-user>/sidetrack
 cd sidetrack
 claude --plugin-dir ./plugins/sidetrack
+python3 -m unittest discover tests
 ```
 
 ## License
