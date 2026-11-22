@@ -48,8 +48,10 @@ def main():
              "Path: " + " > ".join(reversed(state.chain(active, ctxs))),
              "Other contexts: " + (", ".join(n for n in ctxs if n != active) or "none"),
              f"File: {state.rel(state.ctx_path(active))} (read it for full detail)"]
-    if state.has_conflict_markers(active):
-        parts.append("WARNING: this file has unresolved git conflict markers. Tell the user and do not write to it.")
+    conflicted = [n for n in ctxs if state.has_conflict_markers(n)]
+    if conflicted:
+        parts.append("WARNING: unresolved git conflict markers in context file(s): " + ", ".join(conflicted) +
+                     ". Tell the user to run /sidetrack:resolve, and do not write to those files until then.")
 
     for title, limit in (("Current state", 1500), ("Open threads", 1000)):
         body = state.read_section(active, title, limit)

@@ -147,7 +147,6 @@ def load_state() -> dict:
         st["active"] = ROOT_CONTEXT
     if not isinstance(st.get("turns_since_save"), int):
         st["turns_since_save"] = 0
-    st["nudged_at"] = None
     if not isinstance(st.get("nudged_at"), int):
         st["nudged_at"] = None
     return st
@@ -176,6 +175,7 @@ def new_context(name: str, parent: str, purpose: str) -> Path:
                .replace("{{parent}}", parent)
                .replace("{{purpose}}", purpose or "(not set)")
                .replace("{{date}}", today()))
+    text = re.sub(r"(?m)^status:.*$", "status: open", text, count=1)  # never trust the template's status
     p = ctx_path(name)
     atomic_write(p, text)
     return p
@@ -380,6 +380,8 @@ def cmd_list(_args):
         printed.add(n)
         info = ctxs[n]
         mark = "  <- active" if n == st["active"] else ""
+        if has_conflict_markers(n):
+            mark += "  [CONFLICT: run /sidetrack:resolve]"
         purpose = f" | {info['purpose']}" if info["purpose"] else ""
         print(f"{'  ' * depth}- {n} [{info['status'] or '?'}, updated {info['updated'] or '?'}]{purpose}{mark}")
         for c in sorted(children.get(n, [])):

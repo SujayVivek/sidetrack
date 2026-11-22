@@ -184,7 +184,9 @@ class PromptHook(HookBase):
         self.state("go", "deploy")
         p = self.root / ".sidetrack/contexts/deploy.md"
         p.write_text(p.read_text() + "\n<<<<<<< HEAD\nA\n=======\nB\n>>>>>>> other\n")
-        self.assertIn("conflict markers", self.prompt())
+        out = self.prompt()
+        self.assertIn("conflict markers", out)
+        self.assertIn("/sidetrack:resolve", out)
 
     def test_plain_output_mode(self):
         self.state("go", "deploy")
@@ -244,6 +246,15 @@ class SessionStartHook(HookBase):
         self.hook(ON_START, None, raw="nonsense")
         (self.root / ".sidetrack/local/state.json").write_text("")
         self.assertIn("Active context: main", self.start("startup"))
+
+    def test_conflicts_in_any_context_are_announced(self):
+        self.state("go", "deploy")
+        self.state("go", "brainstorm")
+        p = self.root / ".sidetrack/contexts/deploy.md"
+        p.write_text(p.read_text() + "\n<<<<<<< HEAD\nA\n=======\nB\n>>>>>>> other\n")
+        out = self.start("startup")  # active context is brainstorm, the conflict is in deploy
+        self.assertIn("conflict markers in context file(s): deploy", out)
+        self.assertIn("/sidetrack:resolve", out)
 
     def test_missing_contexts_does_not_crash(self):
         self.state("go", "deploy")

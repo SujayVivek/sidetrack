@@ -103,6 +103,25 @@ class StateTests(unittest.TestCase):
         self.assertEqual(self.kv(self.run_cmd("back"))["finished"], "no")
         self.assertIn("status: open", (self.root / ".sidetrack/contexts/deploy.md").read_text())
 
+    def test_template_is_in_sync(self):
+        tpl = (Path(__file__).resolve().parent.parent / "plugins/sidetrack/templates/context.md").read_text()
+        self.assertIn("\nstatus: open\n", tpl)
+
+    def test_new_context_is_open_even_with_a_stale_template(self):
+        import shutil
+        plugin = Path(__file__).resolve().parent.parent / "plugins/sidetrack"
+        copy = self.root / "plugin-copy"
+        shutil.copytree(plugin, copy, ignore=shutil.ignore_patterns("__pycache__"))
+        tpl = copy / "templates/context.md"
+        tpl.write_text(tpl.read_text().replace("status: open", "status: active"))
+        proj = self.root / "proj"
+        proj.mkdir()
+        env = dict(os.environ, CLAUDE_PROJECT_DIR=str(proj))
+        r = subprocess.run([sys.executable, str(copy / "scripts/state.py"), "go", "deploy"], capture_output=True, text=True, env=env)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("status: open", (proj / ".sidetrack/contexts/deploy.md").read_text())
+        self.assertIn("status: open", (proj / ".sidetrack/contexts/main.md").read_text())
+
     def test_rules_printed(self):
         out = self.run_cmd("rules")
         self.assertIn("Merging up to the parent", out)

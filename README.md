@@ -4,7 +4,7 @@ Linked sub-contexts for [Claude Code](https://code.claude.com).
 
 You're building an app, you need to deploy it, and 40 messages of error logs later Claude has lost the thread of what you built. **sidetrack** lets you branch off into a named context (`deploy`, `brainstorm`, `stripe-bug`), work there, and come back. Lessons are handed to the parent context, and everything important lives in markdown files in your repo, so it survives `/compact`, new sessions, and teammates.
 
-> Status: early development (v0.3.2). Commands and hooks work; `/sidetrack:resolve` for merge conflicts is planned.
+> Status: early development (v0.4.1). Commands, hooks and merge-conflict resolution work.
 
 ## Commands
 
@@ -13,7 +13,12 @@ You're building an app, you need to deploy it, and 40 messages of error logs lat
 | `/sidetrack:go <name> [purpose]` | Save the current context, then switch to `<name>` (created as a child of the current one if new) |
 | `/sidetrack:back [done]` | Save, hand lessons up to the parent, switch back. `done` marks the finished context as done. |
 | `/sidetrack:save` | Checkpoint the current context without switching |
-| `/sidetrack:list` | Show the context tree |
+| `/sidetrack:list` | Show the context tree (conflicted contexts are flagged) |
+| `/sidetrack:resolve` | Fix git merge conflicts in context files: keeps every decision and gotcha from both sides, then reconciles the state sections |
+
+### Resolving conflicts
+
+When a pull or merge leaves conflict markers in a context file, run `/sidetrack:resolve`. A script merges what can be merged by rule (every decision, gotcha and "sent to parent" entry from both sides is kept, exact duplicates dropped, entries ordered by date) and saves the original in `.sidetrack/local/resolve/`. Claude then writes one reconciled "Current state" and "Open threads", flagging any contradictions for you to decide. A second script verifies that nothing was lost before it reports success. It never runs git commands: you stage the file and continue your merge yourself.
 
 Context files live in `.sidetrack/contexts/` and are meant to be committed. `.sidetrack/local/` (your active context) is ignored by git automatically.
 

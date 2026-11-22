@@ -2,7 +2,7 @@
 name: {{name}}
 parent: {{parent}}
 purpose: {{purpose}}
-status: active
+status: open
 created: {{date}}
 updated: {{date}}
 ---

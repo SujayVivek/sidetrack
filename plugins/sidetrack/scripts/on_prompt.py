@@ -53,7 +53,7 @@ def main():
     state.save_state(st)
     if state.has_conflict_markers(active):
         tag += (f" WARNING: {state.rel(state.ctx_path(active))} has unresolved git conflict markers. "
-                "Tell the user and do not write to it until they are resolved.")
+                "Tell the user to run /sidetrack:resolve, and do not write to the file until it is resolved.")
     hook_common.emit("UserPromptSubmit", tag)
 
 

@@ -25,7 +25,7 @@ def frontmatter(text):
 
 class SkillTests(unittest.TestCase):
     def test_skills_exist(self):
-        self.assertEqual({p.parent.name for p in SKILLS}, {"go", "back", "save", "list"})
+        self.assertEqual({p.parent.name for p in SKILLS}, {"go", "back", "save", "list", "resolve"})
 
     def test_frontmatter(self):
         for p in SKILLS:
@@ -33,7 +33,7 @@ class SkillTests(unittest.TestCase):
             self.assertEqual(meta["name"], p.parent.name, p)
             self.assertTrue(meta.get("description"), p)
             self.assertEqual(meta.get("disable-model-invocation"), "true", p)
-            self.assertIn("state.py", meta.get("allowed-tools", ""), p)
+            self.assertRegex(meta.get("allowed-tools", ""), r"(state|resolve)\.py", p)
 
     def test_no_arguments_inside_shell_injection(self):
         # $ARGUMENTS inside a !`...` command would be shell injection
