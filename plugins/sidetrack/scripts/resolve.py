@@ -39,6 +39,7 @@ START = re.compile(r"^<{7}(?: .*)?$")
 BASE = re.compile(r"^\|{7}(?: .*)?$")
 MID = re.compile(r"^={7}$")
 END = re.compile(r"^>{7}(?: .*)?$")
+COMMENT_LINE = re.compile(r"^\s*<!--.*-->\s*$")
 ENTRY_DATE = re.compile(r"^- (\d{4}-\d{2}-\d{2})")
 HEADER = re.compile(r"^##[ \t]+(.+?)[ \t]*$")
 FRONT = re.compile(r"\A---\n(.*?)\n---[ \t]*(?:\n|\Z)(.*)\Z", re.S)
@@ -143,7 +144,9 @@ def split_entries(lines):
     """Split an append-only section into (header lines, [entry line-lists])."""
     header, entries = [], []
     for ln in lines:
-        if ln.startswith("- "):
+        if COMMENT_LINE.match(ln):
+            header.append(ln)  # a one-line <!-- comment --> belongs to the section, never to an entry
+        elif ln.startswith("- "):
             entries.append([ln])
         elif entries:
             entries[-1].append(ln)
@@ -203,7 +206,11 @@ def merge_append(ours, theirs):
             stats[side] += 1
             merged.append((d, e))
     merged.sort(key=lambda x: x[0])  # stable: ours first on equal dates
-    lines = list(oh or th)
+    lines, seen_h = [], set()
+    for ln in oh + th:  # section header lines (template comments) from both sides, once each
+        if norm([ln]) not in seen_h:
+            seen_h.add(norm([ln]))
+            lines.append(ln)
     for _, e in merged:
         lines.extend(e)
     return lines, stats

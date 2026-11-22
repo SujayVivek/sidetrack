@@ -214,6 +214,19 @@ class GitConflictCase(unittest.TestCase):
         self.assertIn("(sujay): a", text)
         self.assertIn("(rahul): b", text)
 
+    def test_entries_placed_before_the_comment_do_not_duplicate_it(self):
+        # regression: entries inserted ABOVE the template comment dragged a copy of it along with each entry
+        ours = BASE.replace("## Decisions\n<!-- Append only. -->\n", "## Decisions\n- 2026-11-21 (sujay): use gunicorn\n<!-- Append only. -->\n")
+        theirs = BASE.replace("## Decisions\n<!-- Append only. -->\n", "## Decisions\n- 2026-11-21 (rahul): use Postgres\n<!-- Append only. -->\n")
+        self.make_conflict(ours, theirs)
+        self.run_cmd(RESOLVE, "prepare", "deploy")
+        decisions = self.section(self.f.read_text(), "Decisions")
+        self.assertEqual(decisions.count("<!-- Append only. -->"), 1)
+        lines = [l for l in decisions.splitlines() if l.strip()]
+        self.assertEqual(lines[0], "<!-- Append only. -->")
+        self.assertEqual(len(lines), 4)  # comment, use Railway, gunicorn, Postgres
+        self.assertTrue(all(l.startswith("- ") for l in lines[1:]))
+
     def test_section_only_one_side_added_is_kept(self):
         theirs = THEIRS + "\n## Links\n- https://railway.app/docs\n"
         self.make_conflict(OURS, theirs)

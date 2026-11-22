@@ -4,7 +4,7 @@ Linked sub-contexts for [Claude Code](https://code.claude.com).
 
 You're building an app, you need to deploy it, and 40 messages of error logs later Claude has lost the thread of what you built. **sidetrack** lets you branch off into a named context (`deploy`, `brainstorm`, `stripe-bug`), work there, and come back. Lessons are handed to the parent context, and everything important lives in markdown files in your repo, so it survives `/compact`, new sessions, and teammates.
 
-> Status: early development (v0.4.1). Commands, hooks and merge-conflict resolution work.
+> Status: early development (v0.4.2). Commands, hooks and merge-conflict resolution work.
 
 ## Commands
 
