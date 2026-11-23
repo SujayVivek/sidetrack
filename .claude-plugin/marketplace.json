@@ -7,7 +7,7 @@
       "name": "sidetrack",
       "source": "./plugins/sidetrack",
       "description": "Linked sub-contexts inside one Claude Code chat, backed by markdown files in your repo.",
-      "version": "0.4.2"
+      "version": "0.5.0"
     }
   ]
 }

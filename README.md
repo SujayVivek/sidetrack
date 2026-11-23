@@ -6,7 +6,7 @@ You are building an app. Then you need to deploy it. Forty messages of error log
 
 sidetrack lets you step aside into a named context (`deploy`, `stripe-bug`, `brainstorm`), work there, and come back. What matters is saved in small markdown files in your repo, so it survives `/compact`, new sessions and teammates.
 
-> Status: early development (v0.4.2). Commands, hooks and merge-conflict resolution all work.
+> Status: beta (v0.5.0). Commands, hooks and merge-conflict resolution work. Feedback and issues are welcome.
 
 ## How it works
 
@@ -26,7 +26,7 @@ main ──── go deploy ────▶ deploy ──── back ───�
 ## Quick start
 
 ```
-/plugin marketplace add <github-user>/sidetrack
+/plugin marketplace add SujayVivek/sidetrack
 /plugin install sidetrack@sidetrack
 ```
 
@@ -95,7 +95,7 @@ Never put secrets in context files. They are committed to git.
 ## Develop locally
 
 ```
-git clone https://github.com/<github-user>/sidetrack
+git clone https://github.com/SujayVivek/sidetrack
 cd sidetrack
 claude --plugin-dir ./plugins/sidetrack
 python3 -m unittest discover tests
